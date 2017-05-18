@@ -1,5 +1,3 @@
-EXCHANGE_RATE_TBL = []
-
 BASE_CURRENCY = 'USD'
 
 
@@ -42,6 +40,9 @@ class POSTransaction:
 
 
 class POSTransactionManager:
+    def __init__(self, storage):
+        self._storage = storage
+
     def add_exchange_rate(self, exchange_rate):
         start = exchange_rate.from_dt
         end = exchange_rate.to_dt
@@ -49,18 +50,18 @@ class POSTransactionManager:
             start_rate = self._get_base_exchange_rate(exchange_rate.to_cur, start)
         except NoExchangeRateException:
             start_rate = None
-
         try:
             end_rate = self._get_base_exchange_rate(exchange_rate.to_cur, end)
         except NoExchangeRateException:
             end_rate = None
+
         if start_rate and start_rate == end_rate:
             # we're going to insert range in the middle of existing range
             # ^===========^++++++++++++++++++^============^
             #   start_rate  exchange_rate        new_rate
             new_rate = ExchangeRate(from_cur=start_rate.from_cur, to_cur=start_rate.to_cur, rate=start_rate.rate, from_dt=exchange_rate.to_dt,
                                     to_dt=start_rate.to_dt)
-            EXCHANGE_RATE_TBL.append(new_rate)
+            self._storage.append(new_rate)
             start_rate.to_dt = exchange_rate.from_dt
         elif start_rate and not end_rate:
             # cut start_rate
@@ -68,17 +69,17 @@ class POSTransactionManager:
         elif not start_rate and end_rate:
             # cut end_rate
             end_rate.from_dt = exchange_rate.to_dt
-        EXCHANGE_RATE_TBL.append(exchange_rate)
+        self._storage.append(exchange_rate)
 
     def list_exchange_rates(self):
-        return [ExchangeRate(**x) for x in EXCHANGE_RATE_TBL]
+        return self._storage
 
     def _get_base_exchange_rate(self, cur, timestamp):
         # Poor implementation in assumption that we shouldn't use DB.
         # In real live we should user database to store and fetch data instead of global variable.
-        for rate in EXCHANGE_RATE_TBL:
-            if rate['to_cur'] == cur:
-                if rate['from_dt'] >= timestamp > rate['to_dt']:
+        for rate in self._storage:
+            if rate.to_cur == cur:
+                if rate.from_dt <= timestamp < rate.to_dt:
                     return rate
         raise NoExchangeRateException('Currency: {}, timestamp {}'.format(cur, timestamp))
 
