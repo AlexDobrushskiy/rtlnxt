@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 BASE_CURRENCY = 'USD'
 
 
@@ -7,7 +8,10 @@ class NoExchangeRateException(Exception):
 
 class ExchangeRate:
     """
-    Assumption/limitation: 'from_cur' is always = BASE_CURRENCY. 'to_cur' may vary.
+    Exchange rate entity represents exchange rate between two currencies
+    in a given time range.
+    For simplifying purposes we assume that first currency ('from_cur' constructor parameter)
+    should be always equal to BASE_CURRENCY.
     """
 
     def __init__(self, from_cur, to_cur, rate, from_dt, to_dt):
@@ -40,10 +44,18 @@ class POSTransaction:
 
 
 class POSTransactionManager:
+    """
+    Interface which implements user-visible methods:
+    """
     def __init__(self, storage):
         self._storage = storage
 
     def add_exchange_rate(self, exchange_rate):
+        """
+        Adds exchange rate record to storage.
+        Implements logic of splitting record, or cutting record if
+        new record intersects with existing one by time range when they have common currency pair.
+        """
         start = exchange_rate.from_dt
         end = exchange_rate.to_dt
         try:
@@ -72,11 +84,16 @@ class POSTransactionManager:
         self._storage.append(exchange_rate)
 
     def list_exchange_rates(self):
+        """
+        Returns list of all exchange rates from storage.
+        """
         return self._storage
 
     def _get_base_exchange_rate(self, cur, timestamp):
-        # Poor implementation in assumption that we shouldn't use DB.
-        # In real live we should user database to store and fetch data instead of global variable.
+        """
+        Comlexity is linear (of number records in storage).
+        In real life database should be used instead of variable
+        """
         for rate in self._storage:
             if rate.to_cur == cur:
                 if rate.from_dt <= timestamp < rate.to_dt:
@@ -84,6 +101,17 @@ class POSTransactionManager:
         raise NoExchangeRateException('Currency: {}, timestamp {}'.format(cur, timestamp))
 
     def get_exchange_rate(self, from_cur, to_cur, timestamp):
+        """
+        Tries to find exchange rate between two currencies in a give timestamp.
+        If no conversion rate found -
+        """
+        if from_cur == BASE_CURRENCY:
+            base_to = self._get_base_exchange_rate(to_cur, timestamp).rate
+            return base_to
+        if to_cur == BASE_CURRENCY:
+            base_from = self._get_base_exchange_rate(from_cur, timestamp).rate
+            return 1./base_from
+
         base_from = self._get_base_exchange_rate(from_cur, timestamp).rate
         base_to = self._get_base_exchange_rate(to_cur, timestamp).rate
         return base_to / base_from

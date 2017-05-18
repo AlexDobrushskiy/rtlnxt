@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import unittest
 from datetime import datetime
 
@@ -82,6 +83,27 @@ class GetExchangeRateTestCase(unittest.TestCase):
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         rub_thb = transaction_manager.get_exchange_rate(CURRENCY_RUB, CURRENCY_THB, datetime(2017, 3, 1, 1))
         self.assertAlmostEqual(rub_thb, 0.5)
+
+    def test_get_exchange_rate_thb_rub(self):
+        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager.add_exchange_rate(self.exchange_rate1)
+        transaction_manager.add_exchange_rate(self.exchange_rate2)
+        rub_thb = transaction_manager.get_exchange_rate(CURRENCY_THB, CURRENCY_RUB, datetime(2017, 3, 1, 1))
+        self.assertAlmostEqual(rub_thb, 2)
+
+    def test_get_exchange_rate_usd_rub(self):
+        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager.add_exchange_rate(self.exchange_rate1)
+        transaction_manager.add_exchange_rate(self.exchange_rate2)
+        usd_rub = transaction_manager.get_exchange_rate(CURRENCY_USD, CURRENCY_RUB, datetime(2017, 3, 1, 1))
+        self.assertAlmostEqual(usd_rub, 60.)
+
+    def test_get_exchange_rate_rub_usd(self):
+        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager.add_exchange_rate(self.exchange_rate1)
+        transaction_manager.add_exchange_rate(self.exchange_rate2)
+        usd_rub = transaction_manager.get_exchange_rate(CURRENCY_RUB, CURRENCY_USD, datetime(2017, 3, 1, 1))
+        self.assertAlmostEqual(usd_rub, 1./60.)
 
 
 class ConvertPOSTransactionTestCase(unittest.TestCase):
