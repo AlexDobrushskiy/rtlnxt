@@ -1,5 +1,9 @@
 #!/usr/bin/python3
+from collections import defaultdict
+from datetime import datetime
+
 BASE_CURRENCY = 'USD'
+PLUS_INFINITY = datetime(9999, 12, 31, 23, 59, 59)
 
 
 class NoExchangeRateException(Exception):
@@ -17,7 +21,8 @@ class ExchangeRate:
     def __init__(self, from_cur, to_cur, rate, from_dt, to_dt):
         if from_cur != BASE_CURRENCY:
             raise ValueError('from_cur parameter is expected to be base currency: {}'.format(BASE_CURRENCY))
-        if to_dt <= from_dt:
+        if to_dt and to_dt <= from_dt:
+            from ipdb import set_trace; set_trace()
             raise ValueError('from_dt timestamp should be < to_dt')
 
         self.from_cur = from_cur
@@ -48,8 +53,17 @@ class POSTransactionManager:
     Interface which implements user-visible methods:
     """
 
-    def __init__(self, storage):
-        self._storage = storage
+    def __init__(self):
+        """
+        storage - dict with the following structure:
+         {'RUB': {'latest': <ExchangeRate object>, rates: [<list of ExchangeRate objects>]},
+         ...
+         }
+        """
+        def dict_factory():
+            return {'latest': None, 'rates': []}
+
+        self._storage = defaultdict(dict_factory)
 
     def add_exchange_rate(self, exchange_rate):
         """
@@ -59,14 +73,8 @@ class POSTransactionManager:
         """
         start = exchange_rate.from_dt
         end = exchange_rate.to_dt
-        try:
-            start_rate = self._get_base_exchange_rate(exchange_rate.to_cur, start)
-        except NoExchangeRateException:
-            start_rate = None
-        try:
-            end_rate = self._get_base_exchange_rate(exchange_rate.to_cur, end)
-        except NoExchangeRateException:
-            end_rate = None
+        start_rate = self._get_base_exchange_rate(exchange_rate.to_cur, start)
+        end_rate = self._get_base_exchange_rate(exchange_rate.to_cur, end)
 
         if start_rate and start_rate == end_rate:
             # we're going to insert range in the middle of existing range
@@ -75,7 +83,10 @@ class POSTransactionManager:
             new_rate = ExchangeRate(from_cur=start_rate.from_cur, to_cur=start_rate.to_cur, rate=start_rate.rate,
                                     from_dt=exchange_rate.to_dt,
                                     to_dt=start_rate.to_dt)
-            self._storage.append(new_rate)
+            self._storage[start_rate.to_cur]['rates'].append(new_rate)
+            if self._storage[start_rate.to_cur]['latest'] == start_rate:
+                self._storage[start_rate.to_cur]['latest'] = new_rate
+
             start_rate.to_dt = exchange_rate.from_dt
         elif start_rate and not end_rate:
             # cut start_rate
@@ -88,23 +99,33 @@ class POSTransactionManager:
         rates_to_delete = self._get_base_exchange_rates_within_range(exchange_rate.to_cur, exchange_rate.from_dt,
                                                                      exchange_rate.to_dt)
         for rate_to_delete in rates_to_delete:
-            self._storage.remove(rate_to_delete)
+            self._storage[exchange_rate.to_cur]['rates'].remove(rate_to_delete)
 
-        self._storage.append(exchange_rate)
+        self._storage[exchange_rate.to_cur]['rates'].append(exchange_rate)
+        if not self._storage[exchange_rate.to_cur]['latest'] or exchange_rate.from_dt > self._storage[exchange_rate.to_cur]['latest'].from_dt:
+            self._storage[exchange_rate.to_cur]['latest'] = exchange_rate
+
+        # To guarantee that latest record's 'to_dt' points to +inf
+        self._storage[exchange_rate.to_cur]['latest'].to_dt = PLUS_INFINITY
 
     def list_exchange_rates(self):
         """
         Returns list of all exchange rates from storage.
         """
-        return self._storage
+        result = []
+        for key in self._storage.keys():
+            result += self._storage[key]['rates']
+        return result
 
     def _get_base_exchange_rate(self, cur, timestamp):
         """
         Comlexity is linear (of number records in storage).
         In real life database should be used instead of variable
         """
-        for rate in self._storage:
-            if rate.to_cur == cur:
+        if cur in self._storage:
+            if timestamp > self._storage[cur]['latest'].from_dt:
+                return self._storage[cur]['latest']
+            for rate in self._storage[cur]['rates']:
                 if rate.from_dt <= timestamp < rate.to_dt:
                     return rate
         return None
@@ -114,8 +135,8 @@ class POSTransactionManager:
         Linear complexity of storage length
         """
         result = []
-        for rate in self._storage:
-            if rate.to_cur == cur:
+        if cur in self._storage:
+            for rate in self._storage[cur]['rates']:
                 if range_from <= rate.from_dt <= rate.to_dt <= range_to:
                     result.append(rate)
         return result

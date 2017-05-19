@@ -2,7 +2,7 @@
 import unittest
 from datetime import datetime
 
-from main import POSTransactionManager, ExchangeRate, POSTransaction
+from main import POSTransactionManager, ExchangeRate, POSTransaction, PLUS_INFINITY
 
 CURRENCY_RUB = 'RUB'
 CURRENCY_USD = 'USD'
@@ -15,51 +15,51 @@ class AddExchangeRateTestCase(unittest.TestCase):
     def setUp(self):
         self.timestamp1 = datetime(2017, 3, 1, 3)
         self.exchange_rate1 = ExchangeRate(CURRENCY_USD, CURRENCY_RUB, 60., datetime(2017, 3, 1, 0),
-                                           datetime(2017, 3, 2, 0))
+                                           PLUS_INFINITY)
         self.exchange_rate2 = ExchangeRate(CURRENCY_USD, CURRENCY_RUB, 60., datetime(2017, 3, 1, 1),
                                            self.timestamp1)
         self.exchange_rate3 = ExchangeRate(CURRENCY_USD, CURRENCY_RUB, 60., datetime(2017, 2, 27, 1),
                                            self.timestamp1)
         self.exchange_rate4 = ExchangeRate(CURRENCY_USD, CURRENCY_RUB, 60., datetime(2017, 1, 27, 1),
-                                           datetime(2017, 4, 27, 1))
+                                           PLUS_INFINITY)
 
     def test_add_exchange_rate_base(self):
-        transaction_manager = POSTransactionManager(storage=[])
-        self.assertEqual(len(transaction_manager._storage), 0)
+        transaction_manager = POSTransactionManager()
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 0)
 
         transaction_manager.add_exchange_rate(self.exchange_rate1)
-        self.assertEqual(len(transaction_manager._storage), 1)
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 1)
 
-        rate = transaction_manager._storage[0]
+        rate = transaction_manager._storage[CURRENCY_RUB]['rates'][0]
         self.assertEqual(rate, self.exchange_rate1)
 
     def test_add_exchange_rate_between(self):
-        transaction_manager = POSTransactionManager(storage=[])
-        self.assertEqual(len(transaction_manager._storage), 0)
+        transaction_manager = POSTransactionManager()
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 0)
 
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
-        self.assertEqual(len(transaction_manager._storage), 3)
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 3)
 
     def test_add_exchange_rate_in_the_begining(self):
-        transaction_manager = POSTransactionManager(storage=[])
-        self.assertEqual(len(transaction_manager._storage), 0)
+        transaction_manager = POSTransactionManager()
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 0)
 
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate3)
-        self.assertEqual(len(transaction_manager._storage), 2)
-        self.assertEqual(transaction_manager._storage[0].from_dt, self.timestamp1)
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 2)
+        self.assertEqual(transaction_manager.list_exchange_rates()[0].from_dt, self.timestamp1)
 
     def test_add_exchange_rate_remove_old_ones(self):
-        transaction_manager = POSTransactionManager(storage=[])
-        self.assertEqual(len(transaction_manager._storage), 0)
+        transaction_manager = POSTransactionManager()
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 0)
 
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         transaction_manager.add_exchange_rate(self.exchange_rate3)
-        self.assertEqual(len(transaction_manager._storage), 2)
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 2)
         transaction_manager.add_exchange_rate(self.exchange_rate4)
-        self.assertEqual(len(transaction_manager._storage), 1)
+        self.assertEqual(len(transaction_manager.list_exchange_rates()), 1)
 
 
 class ListExchangeRatesTestCase(unittest.TestCase):
@@ -72,15 +72,16 @@ class ListExchangeRatesTestCase(unittest.TestCase):
                                            datetime(2017, 3, 4, 0))
 
     def test_rates_list(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         transaction_manager.add_exchange_rate(self.exchange_rate3)
         rates_list = transaction_manager.list_exchange_rates()
-        self.assertEqual(len(rates_list), 3)
+        self.assertEqual(len(rates_list), 4)
         self.assertEqual(rates_list[0].rate, 60.)
         self.assertEqual(rates_list[1].rate, 61.)
-        self.assertEqual(rates_list[2].rate, 62.)
+        self.assertEqual(rates_list[2].rate, 60.)
+        self.assertEqual(rates_list[3].rate, 62.)
 
 
 class GetExchangeRateTestCase(unittest.TestCase):
@@ -91,36 +92,37 @@ class GetExchangeRateTestCase(unittest.TestCase):
                                            datetime(2017, 3, 2, 0))
 
     def test_get_exchange_rate_rub_thb(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         rub_thb = transaction_manager.get_exchange_rate(CURRENCY_RUB, CURRENCY_THB, datetime(2017, 3, 1, 1))
         self.assertAlmostEqual(rub_thb, 0.5)
 
     def test_get_exchange_rate_thb_rub(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         rub_thb = transaction_manager.get_exchange_rate(CURRENCY_THB, CURRENCY_RUB, datetime(2017, 3, 1, 1))
         self.assertAlmostEqual(rub_thb, 2)
 
     def test_get_exchange_rate_usd_rub(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         usd_rub = transaction_manager.get_exchange_rate(CURRENCY_USD, CURRENCY_RUB, datetime(2017, 3, 1, 1))
         self.assertAlmostEqual(usd_rub, 60.)
 
     def test_get_exchange_rate_rub_usd(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         usd_rub = transaction_manager.get_exchange_rate(CURRENCY_RUB, CURRENCY_USD, datetime(2017, 3, 1, 1))
         self.assertAlmostEqual(usd_rub, 1./60.)
 
     def test_eur_to_eur_exchange_rate(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         self.assertEqual(transaction_manager.get_exchange_rate(CURRENCY_EUR, CURRENCY_EUR, datetime.now()), 1.)
+
 
 class ConvertPOSTransactionTestCase(unittest.TestCase):
     def setUp(self):
@@ -131,7 +133,7 @@ class ConvertPOSTransactionTestCase(unittest.TestCase):
         self.pos_transaction = POSTransaction(3.62, CURRENCY_RUB, datetime(2017, 3, 1, 1))
 
     def test_convert_pos_transaction(self):
-        transaction_manager = POSTransactionManager(storage=[])
+        transaction_manager = POSTransactionManager()
         transaction_manager.add_exchange_rate(self.exchange_rate1)
         transaction_manager.add_exchange_rate(self.exchange_rate2)
         converted_transaction = transaction_manager.convert_pos_transaction(self.pos_transaction, CURRENCY_THB)
