@@ -47,6 +47,7 @@ class POSTransactionManager:
     """
     Interface which implements user-visible methods:
     """
+
     def __init__(self, storage):
         self._storage = storage
 
@@ -71,7 +72,8 @@ class POSTransactionManager:
             # we're going to insert range in the middle of existing range
             # ^===========^++++++++++++++++++^============^
             #   start_rate  exchange_rate        new_rate
-            new_rate = ExchangeRate(from_cur=start_rate.from_cur, to_cur=start_rate.to_cur, rate=start_rate.rate, from_dt=exchange_rate.to_dt,
+            new_rate = ExchangeRate(from_cur=start_rate.from_cur, to_cur=start_rate.to_cur, rate=start_rate.rate,
+                                    from_dt=exchange_rate.to_dt,
                                     to_dt=start_rate.to_dt)
             self._storage.append(new_rate)
             start_rate.to_dt = exchange_rate.from_dt
@@ -105,7 +107,7 @@ class POSTransactionManager:
             if rate.to_cur == cur:
                 if rate.from_dt <= timestamp < rate.to_dt:
                     return rate
-        raise NoExchangeRateException('Currency: {}, timestamp {}'.format(cur, timestamp))
+        return None
 
     def _get_base_exchange_rates_within_range(self, cur, range_from, range_to):
         """
@@ -121,18 +123,23 @@ class POSTransactionManager:
     def get_exchange_rate(self, from_cur, to_cur, timestamp):
         """
         Tries to find exchange rate between two currencies in a give timestamp.
-        If no conversion rate found -
         """
-        if from_cur == BASE_CURRENCY:
-            base_to = self._get_base_exchange_rate(to_cur, timestamp).rate
-            return base_to
-        if to_cur == BASE_CURRENCY:
-            base_from = self._get_base_exchange_rate(from_cur, timestamp).rate
-            return 1./base_from
+        if from_cur == to_cur:
+            return 1.
 
-        base_from = self._get_base_exchange_rate(from_cur, timestamp).rate
-        base_to = self._get_base_exchange_rate(to_cur, timestamp).rate
-        return base_to / base_from
+        base_from = self._get_base_exchange_rate(from_cur, timestamp)
+        base_to = self._get_base_exchange_rate(to_cur, timestamp)
+        if not base_from and from_cur != BASE_CURRENCY:
+            raise NoExchangeRateException('Currency: {}, timestamp {}'.format(from_cur, timestamp))
+        if not base_to and to_cur != BASE_CURRENCY:
+            raise NoExchangeRateException('Currency: {}, timestamp {}'.format(to_cur, timestamp))
+
+        if from_cur == BASE_CURRENCY:
+            return base_to.rate
+        if to_cur == BASE_CURRENCY:
+            return 1. / base_from.rate
+
+        return base_to.rate / base_from.rate
 
     def convert_pos_transaction(self, pos_transaction, convert_to):
         """

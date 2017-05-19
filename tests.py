@@ -118,6 +118,9 @@ class GetExchangeRateTestCase(unittest.TestCase):
         usd_rub = transaction_manager.get_exchange_rate(CURRENCY_RUB, CURRENCY_USD, datetime(2017, 3, 1, 1))
         self.assertAlmostEqual(usd_rub, 1./60.)
 
+    def test_eur_to_eur_exchange_rate(self):
+        transaction_manager = POSTransactionManager(storage=[])
+        self.assertEqual(transaction_manager.get_exchange_rate(CURRENCY_EUR, CURRENCY_EUR, datetime.now()), 1.)
 
 class ConvertPOSTransactionTestCase(unittest.TestCase):
     def setUp(self):
