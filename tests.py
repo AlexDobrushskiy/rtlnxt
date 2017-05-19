@@ -20,6 +20,8 @@ class AddExchangeRateTestCase(unittest.TestCase):
                                            self.timestamp1)
         self.exchange_rate3 = ExchangeRate(CURRENCY_USD, CURRENCY_RUB, 60., datetime(2017, 2, 27, 1),
                                            self.timestamp1)
+        self.exchange_rate4 = ExchangeRate(CURRENCY_USD, CURRENCY_RUB, 60., datetime(2017, 1, 27, 1),
+                                           datetime(2017, 4, 27, 1))
 
     def test_add_exchange_rate_base(self):
         transaction_manager = POSTransactionManager(storage=[])
@@ -47,6 +49,17 @@ class AddExchangeRateTestCase(unittest.TestCase):
         transaction_manager.add_exchange_rate(self.exchange_rate3)
         self.assertEqual(len(transaction_manager._storage), 2)
         self.assertEqual(transaction_manager._storage[0].from_dt, self.timestamp1)
+
+    def test_add_exchange_rate_remove_old_ones(self):
+        transaction_manager = POSTransactionManager(storage=[])
+        self.assertEqual(len(transaction_manager._storage), 0)
+
+        transaction_manager.add_exchange_rate(self.exchange_rate1)
+        transaction_manager.add_exchange_rate(self.exchange_rate2)
+        transaction_manager.add_exchange_rate(self.exchange_rate3)
+        self.assertEqual(len(transaction_manager._storage), 2)
+        transaction_manager.add_exchange_rate(self.exchange_rate4)
+        self.assertEqual(len(transaction_manager._storage), 1)
 
 
 class ListExchangeRatesTestCase(unittest.TestCase):

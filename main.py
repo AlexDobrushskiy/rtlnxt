@@ -81,6 +81,13 @@ class POSTransactionManager:
         elif not start_rate and end_rate:
             # cut end_rate
             end_rate.from_dt = exchange_rate.to_dt
+
+        # Find all rates X where exchange_rate.from_dt <= x.from_dt <= x.to_dt <= exchange_rate.to_dt, and remove them.
+        rates_to_delete = self._get_base_exchange_rates_within_range(exchange_rate.to_cur, exchange_rate.from_dt,
+                                                                     exchange_rate.to_dt)
+        for rate_to_delete in rates_to_delete:
+            self._storage.remove(rate_to_delete)
+
         self._storage.append(exchange_rate)
 
     def list_exchange_rates(self):
@@ -99,6 +106,17 @@ class POSTransactionManager:
                 if rate.from_dt <= timestamp < rate.to_dt:
                     return rate
         raise NoExchangeRateException('Currency: {}, timestamp {}'.format(cur, timestamp))
+
+    def _get_base_exchange_rates_within_range(self, cur, range_from, range_to):
+        """
+        Linear complexity of storage length
+        """
+        result = []
+        for rate in self._storage:
+            if rate.to_cur == cur:
+                if range_from <= rate.from_dt <= rate.to_dt <= range_to:
+                    result.append(rate)
+        return result
 
     def get_exchange_rate(self, from_cur, to_cur, timestamp):
         """
